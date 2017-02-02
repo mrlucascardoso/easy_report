@@ -22,7 +22,7 @@ class Builder(object):
     """
     Gerador de relatorios em pdf
     """
-    def __init__(self, empresa, title, columns_width, table_header, table_data, buffer, report_type=types.TABLE, table_footer=None, header=None, filename_logo=None, show_pages=True, landscape=False, extra_tables=None):
+    def __init__(self, empresa, title, columns_width, table_header, table_data, buffer, report_type=types.TABLE, table_footer=None, header=None, filename_logo=None, show_pages=True, landscape=False, extra_tables=[]):
         """
         Contrutor do relatorio
         :param title: Titulo
@@ -148,7 +148,7 @@ class Builder(object):
 
         _data = [[Paragraph(str(value), self.get_align(self.columns_width[index][1])) for index, value in enumerate(row)] for row in self.table_data]
         table_data.extend(_data)
-        core_table.extend(_data)
+        core_table.extend([Paragraph(''), Paragraph('')] + _data)
 
         # Estilo da tabela
         table_style = [
