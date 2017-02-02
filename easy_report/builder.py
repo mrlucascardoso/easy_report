@@ -67,6 +67,7 @@ class Builder(object):
         self.show_pages = show_pages
         self.report_type = report_type
         self.elements = []
+        self.extra_tables = extra_tables
 
     def build(self):
         """
