@@ -148,6 +148,7 @@ class Builder(object):
 
         _data = [[Paragraph(str(value), self.get_align(self.columns_width[index][1])) for index, value in enumerate(row)] for row in self.table_data]
         table_data.extend(_data)
+        styles = getSampleStyleSheet()
         core_table.extend([Paragraph('', styles['Heading3']), Paragraph('', styles['Heading3'])] + _data)
 
         # Estilo da tabela
