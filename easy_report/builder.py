@@ -22,7 +22,7 @@ class Builder(object):
     """
     Gerador de relatorios em pdf
     """
-    def __init__(self, empresa, title, columns_width, table_header, table_data, buffer, report_type=types.TABLE, table_footer=None, header=None, filename_logo=None, show_pages=True, landscape=False):
+    def __init__(self, empresa, title, columns_width, table_header, table_data, buffer, report_type=types.TABLE, table_footer=None, header=None, filename_logo=None, show_pages=True, landscape=False, extra_tables=None):
         """
         Contrutor do relatorio
         :param title: Titulo
@@ -36,6 +36,7 @@ class Builder(object):
         :param filename_logo: caminho do arquivo da imagem do relatório, caso não passe sea usado um padrão
         :param show_pages: Se quizer que apareça as paginas, caso contrario coloque False
         :param landscape: True para relatorio em paisagem, por default é False
+        :param extra_tables: lista de tabelas extras
         """
         self.empresa = empresa.upper()
         self.title = title.upper()
@@ -142,8 +143,11 @@ class Builder(object):
             self.table_header
         ]
 
+        core_table = []
+
         _data = [[Paragraph(str(value), self.get_align(self.columns_width[index][1])) for index, value in enumerate(row)] for row in self.table_data]
         table_data.extend(_data)
+        core_table.extend(_data)
 
         # Estilo da tabela
         table_style = [
@@ -160,18 +164,26 @@ class Builder(object):
         ]
         if self.table_footer:
             table_data.append(self.table_footer)
+            core_table.append(self.table_footer)
             table_style.append(('BACKGROUND', (0, -1), (self.num_cols - 1, -1), HexColor(0x426B8E)))
             table_style.append(('TEXTCOLOR', (0, -1), (self.num_cols - 1, -1), colors.white))
             # aplicando o alinhamento de cada coluna no footer
             for index, column in enumerate(self.columns_width):
                 table_style.append(('ALIGN', (index, -1), (index, -1), column[1]))
 
-
         # Criando a tabela
         user_table = Table(table_data, colWidths=[(doc.width / 100.0) * w[0] for w in self.columns_width])
         user_table.setStyle(TableStyle(table_style))
 
+        # criando core table
+        self._core_table = Table(core_table, colWidths=[(doc.width / 100.0) * w[0] for w in self.columns_width])
+        self._core_table.setStyle(TableStyle(table_style))
+
         self.elements.append(user_table)
+
+        for ext_buider in self.extra_tables:
+            ext_buider.build()
+            self.elements.append(ext_buider._core_table)
 
     def build_normal(self, doc):
         """
