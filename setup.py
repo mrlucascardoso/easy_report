@@ -11,7 +11,7 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
     name='easy-report',
-    version='0.8',
+    version='0.9',
     packages=find_packages(),
     install_requires=[
         'reportlab==3.3.0'
