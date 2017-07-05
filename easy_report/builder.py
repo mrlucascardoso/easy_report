@@ -15,17 +15,24 @@ from reportlab.platypus import SimpleDocTemplate
 from reportlab.platypus import Table
 from reportlab.platypus import TableStyle
 from reportlab.rl_config import canvas_basefontname as _baseFontName, baseUnderlineProportion as _baseUnderlineProportion
-from .utils import types
+from datetime import datetime
+
+from legado.report import types
+
+from infoseguro import settings
 
 
 class Builder(object):
     """
     Gerador de relatorios em pdf
     """
-    def __init__(self, empresa, title, columns_width, table_header, table_data, buffer, report_type=types.TABLE, table_footer=None, header=None, filename_logo=None, show_pages=True, landscape=False, extra_tables=[]):
+    def __init__(self, usuario_nome, empresa_nome, title, columns_width, table_header, table_data, 
+        buffer, report_type=types.TABLE, table_footer=None, header=None, filename_logo=None, show_pages=True, landscape=False, extra_tables=[]):
         """
         Contrutor do relatorio
         :param title: Titulo
+        :param usuario_nome: Nome do usuário que está gerando o relatório
+        :param usuario_nome: Nome da empresa que está gerando o relatório
         :param header: Dicionario com outros valores filtros no relatório
         :param columns_width: Lista com as larguras das colunas em porcentagem
         :param table_header: lista com titulos de cada coluns da tabela
@@ -33,18 +40,21 @@ class Builder(object):
         :param table_footer: lista com o footer do relatorio
         :param buffer: Buffer de geração
         :param report_type: Tipo do relatório, TABLE, GRAPH, NORMAL, CUSTOM
-        :param filename_logo: caminho do arquivo da imagem do relatório, caso não passe sea usado um padrão
+        :param filename_logo: caminho do arquivo da imagem do relatório, caso não passe será usado um padrão
+        :param logo_width: Largura que a imagem ocupará no relatório
+        :param logo_height: Altura que a imagem ocupará no relatório
         :param show_pages: Se quizer que apareça as paginas, caso contrario coloque False
         :param landscape: True para relatorio em paisagem, por default é False
-        :param extra_tables: lista de tabelas extras
+        :param extra_tables: lista de tabelas extra_tables
         """
-        self.empresa = empresa.upper()
+        self.usuario_nome = usuario_nome
+        self.empresa_nome = empresa_nome.upper()
         self.title = title.upper()
 
         # preparando cabeçalho
         styles = getSampleStyleSheet()
         self.header = [
-            Paragraph(self.empresa, styles['Heading3']),
+            Paragraph(self.empresa_nome, styles['Heading3']),
             Paragraph(self.title, styles['Heading5']),
         ]
         if header:
@@ -61,9 +71,12 @@ class Builder(object):
         self.pagesize = set_landscape(A4) if landscape else A4
         self.width, self.height = self.pagesize
         if not filename_logo:
-            self.filename_logo = self.get_filename_image()
+            self.filename_logo = "enterprise.png"
+            self.logo_width = 50
         else:
             self.filename_logo = filename_logo
+            self.logo_width = logo_width
+            self.logo_height = logo_height
         self.show_pages = show_pages
         self.report_type = report_type
         self.elements = []
@@ -79,7 +92,7 @@ class Builder(object):
             buffer,
             rightMargin=inch / 6,
             leftMargin=inch / 6,
-            topMargin=inch / 9,
+            topMargin=inch,
             bottomMargin=inch / 4,
             pagesize=self.pagesize,
             title=self.title
@@ -92,22 +105,30 @@ class Builder(object):
         # Draw things on the PDF. Here's where the PDF generation happens.
         # See the ReportLab documentation for the full list of functionality.
 
-        image_side = Image(self.filename_logo, width=80, height=80)
-        image_side.hAlign = 'LEFT'
-        image_side.spaceAfter = 10
-        self.elements.append(ImageAndFlowables(
-            image_side,
-            self.header,
-            imageSide='left'
-        ))
+        # image_side = Image(self.filename_logo, width=45, height=45)
+        # image_side.hAlign = 'LEFT'
+        # image_side.spaceAfter = 10
+        # self.elements.append(ImageAndFlowables(
+            # image_side,
+            # self.header,
+            # imageSide='left'
+        # ))
 
         self.switch_type(doc)
 
         if self.show_pages:
             if not self.landscape:
-                doc.build(self.elements, canvasmaker=PaginadorPortrait)
+                doc.build(self.elements, 
+                    canvasmaker=PaginadorPortrait, 
+                    onLaterPages=self._header_footer,
+                    onFirstPage=self._header_footer
+                )
             else:
-                doc.build(self.elements, canvasmaker=PaginadorLandscape)
+                doc.build(self.elements, 
+                    canvasmaker=PaginadorLandscape, 
+                    onLaterPages=self._header_footer,
+                    onFirstPage=self._header_footer
+                )
         else:
             doc.build(self.elements)
 
@@ -144,13 +165,8 @@ class Builder(object):
             self.table_header
         ]
 
-        styles = getSampleStyleSheet()
-
-        core_table = [self.table_header]
-
         _data = [[Paragraph(str(value), self.get_align(self.columns_width[index][1])) for index, value in enumerate(row)] for row in self.table_data]
         table_data.extend(_data)
-        core_table.extend(_data)
 
         # Estilo da tabela
         table_style = [
@@ -167,7 +183,6 @@ class Builder(object):
         ]
         if self.table_footer:
             table_data.append(self.table_footer)
-            core_table.append(self.table_footer)
             table_style.append(('BACKGROUND', (0, -1), (self.num_cols - 1, -1), HexColor(0x426B8E)))
             table_style.append(('TEXTCOLOR', (0, -1), (self.num_cols - 1, -1), colors.white))
             # aplicando o alinhamento de cada coluna no footer
@@ -175,12 +190,8 @@ class Builder(object):
                 table_style.append(('ALIGN', (index, -1), (index, -1), column[1]))
 
         # Criando a tabela
-        user_table = Table(table_data, colWidths=[(doc.width / 100.0) * w[0] for w in self.columns_width])
+        user_table = Table(table_data, colWidths=[(doc.width / 100.0) * w[0] for w in self.columns_width], repeatRows=1)
         user_table.setStyle(TableStyle(table_style))
-
-        # criando core table
-        self._core_table = Table(core_table, colWidths=[(doc.width / 100.0) * w[0] for w in self.columns_width])
-        self._core_table.setStyle(TableStyle(table_style))
 
         self.elements.append(user_table)
 
@@ -239,15 +250,6 @@ class Builder(object):
             self.elements.append(ext_buider._core_table)
 
     @staticmethod
-    def get_filename_image():
-        """
-        Retorna a url da imagem da infog2 como padrão
-        :return: a url
-        """
-
-        return 'https://cdn3.iconfinder.com/data/icons/meanicons-4/512/meanicons_60-128.png'
-
-    @staticmethod
     def get_align(align):
         """
         Define o alinhamento da celula de acordo com o parametro
@@ -267,6 +269,46 @@ class Builder(object):
             return column_style_center
 
         return column_style_left
+
+
+    def _header_footer(self, canvas, doc):
+        # Save the state of our canvas so we can draw on it
+        canvas.saveState()
+        styles = getSampleStyleSheet()
+
+        img_width = 50
+
+        if self.filename_logo:
+            img_width = self.logo_width
+            img = Image(self.filename_logo, width=self.logo_width, height=self.logo_height)
+            w, h = img.wrap(doc.width, doc.topMargin)
+            img.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - h)
+
+        altura = 0
+        for num, head in enumerate(self.header):
+            w, h = self.header[num].wrap(doc.width, doc.topMargin)
+            
+            self.header[num].drawOn(
+                canvas,
+                doc.leftMargin+img_width+10,
+                (doc.height + doc.topMargin - h) - altura
+            )
+            
+            if num < 2:
+                altura+=12
+            else:
+                altura+=7
+
+        identificacao = Paragraph("{}<br />{}".format(
+            self.usuario_nome.title() if self.usuario_nome else '',
+            datetime.now().strftime("%d/%m/%Y - %H:%M:%S")), 
+            styles['Heading5']
+        )
+        
+        w, h = identificacao.wrap(doc.width, doc.topMargin)
+        identificacao.drawOn(canvas, doc.leftMargin, 5)
+
+        canvas.restoreState()
 
 
 class PaginadorPortrait(canvas.Canvas):
