@@ -22,7 +22,7 @@ class Builder(object):
     """
     Gerador de relatorios em pdf
     """
-    def __init__(self, empresa, title, columns_width, table_header, table_data, buffer, report_type=types.TABLE, table_footer=None, header=None, filename_logo=None, show_pages=True, landscape=False, extra_tables=[]):
+    def __init__(self, empresa, title, columns_width, table_header, table_data, buffer, report_type=types.TABLE, table_footer=None, header=None, filename_logo=None, show_pages=True, landscape=False, extra_tables=[], set_extra_paragraph=True):
         """
         Contrutor do relatorio
         :param title: Titulo
@@ -68,6 +68,7 @@ class Builder(object):
         self.report_type = report_type
         self.elements = []
         self.extra_tables = extra_tables
+        self.set_extra_paragraph = set_extra_paragraph
 
     def build(self):
         """
@@ -186,10 +187,11 @@ class Builder(object):
 
         for ext_buider in self.extra_tables:
             ext_buider.build()
-            self.elements.append(Paragraph('', styles['Heading1']))
-            self.elements.append(Paragraph('', styles['Heading1']))
-            self.elements.append(Paragraph('', styles['Heading1']))
-            self.elements.append(Paragraph('', styles['Heading1']))
+            if self.set_extra_paragraph:
+                self.elements.append(Paragraph('', styles['Heading1']))
+                self.elements.append(Paragraph('', styles['Heading1']))
+                self.elements.append(Paragraph('', styles['Heading1']))
+                self.elements.append(Paragraph('', styles['Heading1']))
             if ext_buider.report_type == types.NORMAL:
                 self.elements.extend(ext_buider._core_table)
             else:
@@ -208,9 +210,10 @@ class Builder(object):
 
         for ext_buider in self.extra_tables:
             ext_buider.build()
-            self.elements.append(Paragraph('', styles['Heading1']))
-            self.elements.append(Paragraph('', styles['Heading1']))
-            self.elements.append(Paragraph('', styles['Heading1']))
+            if self.set_extra_paragraph:
+                self.elements.append(Paragraph('', styles['Heading1']))
+                self.elements.append(Paragraph('', styles['Heading1']))
+                self.elements.append(Paragraph('', styles['Heading1']))
             if ext_buider.report_type == types.NORMAL:
                 self.elements.extend(ext_buider._core_table)
             else:
