@@ -22,7 +22,7 @@ class Builder(object):
     """
     Gerador de relatorios em pdf
     """
-    def __init__(self, empresa, title, columns_width, table_header, table_data, buffer, report_type=types.TABLE, table_footer=None, header=None, filename_logo=None, show_pages=True, landscape=False, extra_tables=[]):
+    def __init__(self, empresa, title, columns_width, table_header, table_data, buffer, report_type=types.TABLE, table_footer=None, header=None, filename_logo=None, show_pages=True, landscape=False, extra_tables=[], **kwargs):
         """
         Contrutor do relatorio
         :param title: Titulo
@@ -60,6 +60,7 @@ class Builder(object):
         self.landscape = landscape
         self.pagesize = set_landscape(A4) if landscape else A4
         self.width, self.height = self.pagesize
+        self.repeat_header = 0
         if not filename_logo:
             self.filename_logo = self.get_filename_image()
         else:
@@ -68,6 +69,8 @@ class Builder(object):
         self.report_type = report_type
         self.elements = []
         self.extra_tables = extra_tables
+        for key in kwargs.keys():
+            setattr(self, key, kwargs[key])
 
     def build(self):
         """
@@ -79,7 +82,7 @@ class Builder(object):
             buffer,
             rightMargin=inch / 6,
             leftMargin=inch / 6,
-            topMargin=inch / 9,
+            topMargin=inch * 1.3,
             bottomMargin=inch / 4,
             pagesize=self.pagesize,
             title=self.title
@@ -92,22 +95,32 @@ class Builder(object):
         # Draw things on the PDF. Here's where the PDF generation happens.
         # See the ReportLab documentation for the full list of functionality.
 
-        image_side = Image(self.filename_logo, width=80, height=80)
-        image_side.hAlign = 'LEFT'
-        image_side.spaceAfter = 10
-        self.elements.append(ImageAndFlowables(
-            image_side,
-            self.header,
-            imageSide='left'
-        ))
+        # image_side = Image(self.filename_logo, width=80, height=80)
+        # image_side.hAlign = 'LEFT'
+        # image_side.spaceAfter = 10
+        # self.elements.append(ImageAndFlowables(
+        #     image_side,
+        #     self.header,
+        #     imageSide='left'
+        # ))
 
         self.switch_type(doc)
 
         if self.show_pages:
             if not self.landscape:
-                doc.build(self.elements, canvasmaker=PaginadorPortrait)
+                doc.build(
+                    self.elements,
+                    canvasmaker=PaginadorPortrait,
+                    onLaterPages=self._header_footer,
+                    onFirstPage=self._header_footer
+                )
             else:
-                doc.build(self.elements, canvasmaker=PaginadorLandscape)
+                doc.build(
+                    self.elements,
+                    canvasmaker=PaginadorLandscape,
+                    onLaterPages=self._header_footer,
+                    onFirstPage=self._header_footer
+                )
         else:
             doc.build(self.elements)
 
@@ -175,7 +188,12 @@ class Builder(object):
                 table_style.append(('ALIGN', (index, -1), (index, -1), column[1]))
 
         # Criando a tabela
-        user_table = Table(table_data, colWidths=[(doc.width / 100.0) * w[0] for w in self.columns_width])
+        user_table = Table(
+            table_data,
+            colWidths=[(doc.width / 100.0) * w[0] for w in self.columns_width],
+            repeatRows=self.repeat_header
+        )
+
         user_table.setStyle(TableStyle(table_style))
 
         # criando core table
@@ -237,6 +255,45 @@ class Builder(object):
             self.elements.append(Paragraph('', styles['Heading1']))
             self.elements.append(Paragraph('', styles['Heading1']))
             self.elements.append(ext_buider._core_table)
+
+    def _header_footer(self, canvas, doc):
+        # Save the state of our canvas so we can draw on it
+        canvas.saveState()
+        styles = getSampleStyleSheet()
+
+        img_width = 50
+
+        if self.filename_logo:
+            img_width = 80
+            img = Image(self.filename_logo, width=80, height=80)
+            w, h = img.wrap(doc.width, doc.topMargin)
+            img.drawOn(canvas, doc.leftMargin, doc.height + doc.topMargin - h)
+
+        altura = 0
+        for num, head in enumerate(self.header):
+            w, h = self.header[num].wrap(doc.width, doc.topMargin)
+
+            self.header[num].drawOn(
+                canvas,
+                doc.leftMargin + img_width + 10,
+                (doc.height + doc.topMargin - h) - altura
+            )
+
+            if num < 2:
+                altura += 12
+            else:
+                altura += 7
+
+        # identificacao = Paragraph("{}<br />{}".format(
+        #     self.usuario_nome.title() if self.usuario_nome else '',
+        #     datetime.now().strftime("%d/%m/%Y - %H:%M:%S")),
+        #     styles['Heading5']
+        # )
+        #
+        # w, h = identificacao.wrap(doc.width, doc.topMargin)
+        # identificacao.drawOn(canvas, doc.leftMargin, 5)
+
+        canvas.restoreState()
 
     @staticmethod
     def get_filename_image():
