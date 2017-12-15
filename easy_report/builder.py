@@ -280,9 +280,9 @@ class Builder(object):
             )
 
             if num < 2:
-                altura += 12
+                altura += 15
             else:
-                altura += 7
+                altura += 10
 
         # identificacao = Paragraph("{}<br />{}".format(
         #     self.usuario_nome.title() if self.usuario_nome else '',
